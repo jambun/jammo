@@ -40,7 +40,7 @@ class RenderActions {
     method var_no($/) { make $!context{$<string>}}
 
     method section($/) {
-        my $sname = $/[0];
+        my $sname = $/[0].Str;
 
         if ($!context{$sname}:exists && $!context{$sname}.so) {
             if ($!context{$sname}.WHAT ~~ List) {
@@ -49,7 +49,10 @@ class RenderActions {
                     JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :from($!from), :inline);
                 }).join();
             } else {
-                my %context = $!context{$sname}.WHAT ~~ Hash ?? (%$!context, %$!context{$sname}) !! $!context;
+                my %context =  $!context;
+                if $!context{$sname} ~~ Hash {
+                    %context = %context, $!context{$sname}.Hash;
+                }
                 make JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :from($!from), :inline);
             }
         } else {
