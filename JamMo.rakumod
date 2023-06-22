@@ -44,7 +44,7 @@ class RenderActions {
 
         if ($!context{$sname}:exists && $!context{$sname}.so) {
             my %context =  $!context;
-            if ($!context{$sname}.WHAT ~~ List) {
+            if ($!context{$sname}.WHAT ~~ List | Seq) {
                 make ($!context{$sname}.map: -> $ctx {
                     %context ,= $ctx.Hash;
                     JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :from($!from), :inline);
