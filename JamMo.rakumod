@@ -11,7 +11,7 @@ grammar G {
     token close-tag { '}'**2..3 }
     token var  { <open-tag> <.ws> <var-name> <.ws> <close-tag> (<.ws>) }
 
-    token partial    { <open-tag> '>' <.ws> <partial-name> <close-tag> }
+    token partial    { <open-tag> '>' <.ws> <partial-name> <.ws> <close-tag> }
 
     token section-tag { '{{#' }
     token not-section-tag { '{{^' }
