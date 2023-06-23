@@ -22,15 +22,15 @@ grammar G {
 
     token text      { .+? <?before '{{' | $>}
 
-    token var-name  { <[\w\d\_]>+ }
-    token partial-name  { <[\w\d\_]>+ }
-    token section-name  { <[\w\d\_]>+ }
+    token var-name  { <[\w\d_]>+ }
+    token partial-name  { <[\w\d_.\\]>+ }
+    token section-name  { <[\w\d_]>+ }
 }
 
 class RenderActions {
     has $.context;
-    has $.dir = './templates';
-    has $.from;
+    has $.dir;
+    has $.ext;
 
     method TOP($/) { make $<nodes>.made }
     method nodes($/) { make $<node>>>.made.join }
@@ -47,13 +47,13 @@ class RenderActions {
             if ($!context{$sname}.WHAT ~~ List | Seq) {
                 make ($!context{$sname}.map: -> $ctx {
                     %context ,= $ctx.Hash;
-                    JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :from($!from), :inline);
+                    JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :ext($!ext), :inline);
                 }).join();
             } else {
                 if $!context{$sname} ~~ Hash {
                     %context ,= $!context{$sname}.Hash;
                 }
-                make JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :from($!from), :inline);
+                make JamMo::render(:template($<content>.Str), :context(%context), :dir($!dir), :ext($!ext), :inline);
             }
         } else {
             make '';
@@ -66,25 +66,48 @@ class RenderActions {
         if ($!context{$sname}:exists && $!context{$sname}.so) {
             make '';
         } else {
-            make JamMo::render(:template($<content>.Str), :context($!context), :dir($!dir), :from($!from), :inline)
+            make JamMo::render(:template($<content>.Str), :context($!context), :dir($!dir), :ext($!ext), :inline)
         }
     }
 
-    method partial($/) { make JamMo::render(:template($<partial-name>), :context($!context), :dir($!dir), :from($!from)) }
+    method partial($/) { make JamMo::render(:template($<partial-name>.Str), :context($!context), :dir($!dir), :ext($!ext)) }
 
     method text($/) { make $/.Str }
 }
 
-my $DIR;
-my $FROM;
+my $default_ext = 'html';
+my $template_dir;
+my %cache;
 
-our sub get($name) {
-    $FROM{$name} ||= slurp($DIR ~ '/' ~ $name ~ '.html');
-    $FROM{$name};
+our sub default_ext(Str:D $ext?) {
+    $default_ext = $ext if $ext;
+    $default_ext;
 }
 
-our sub render(:$template, :%context, :$dir, :$from, :$inline) {
-    $DIR = $dir;
-    $FROM = $from;
-    G.parse($inline ?? $template !! get($template), :actions(RenderActions.new(:%context, :$dir, :$from))).made;
+our sub template_dir($dir?) {
+    if $dir {
+        die "$dir is not a directory!" unless $dir.IO.d;
+        $template_dir = $dir;
+    }
+    $template_dir;
+}
+
+sub path(Str:D $dir, Str:D $name, Str:D $ext) {
+    (($dir, $name).join('/'), $ext).join('.');
+}
+
+sub get(Str:D $name, $dir, $ext) {
+    die 'No directory provided!' unless $dir || $template_dir;
+    my $path = path($dir || $template_dir, $name, $ext || $default_ext);
+    die "No template found at: $path" unless $path.IO.f;
+    %cache{$path} ||= $path.IO.slurp;
+}
+
+our sub render(Str:D :$template!, :%context, :$dir, :$ext, :$inline) {
+    # $template is a file name to be found in $dir with $ext (or their defaults) or a template string if $inline
+    # in order to support, say, a js template partial inside an html template, $template can include an explicit ext
+    if !$inline && $template.comb('.') == 1 {
+        ($template, $ext) = $template.split('.');
+    }
+    G.parse($inline ?? $template !! get($template, $dir, $ext), :actions(RenderActions.new(:%context, :$dir, :$ext))).made;
 }
