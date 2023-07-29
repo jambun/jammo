@@ -103,7 +103,7 @@ sub get(Str:D $name, $dir, $ext) {
     %cache{$path} ||= $path.IO.slurp;
 }
 
-our sub render(Str:D :$template!, :%context, :$dir, :$ext, :$inline) {
+our sub render(Str:D :$template! is copy, :%context, :$dir, :$ext is copy, :$inline) {
     # $template is a file name to be found in $dir with $ext (or their defaults) or a template string if $inline
     # in order to support, say, a js template partial inside an html template, $template can include an explicit ext
     if !$inline && $template.comb('.') == 1 {
