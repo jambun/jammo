@@ -22,7 +22,7 @@ grammar G {
 
     token text      { .+? <?before '{{' | $>}
 
-    token var-name  { <[\w\d_]>+ }
+    token var-name  { <[\w\d_\.]>+ }
     token partial-name  { <[\w\d_.\\]>+ }
     token section-name  { <[\w\d_]>+ }
 }
@@ -36,7 +36,26 @@ class RenderActions {
     method nodes($/) { make $<node>>>.made.join }
     method node($/) { make ($<var> || $<text> || $<partial> || $<section> || $<not-section>).made }
 
-    method var($/) { make ($!context{$<var-name>}:exists && $!context{$<var-name>}.so) ?? $!context{$<var-name>} ~ $/[0] !! ''}
+#    method var($/) { make ($!context{$<var-name>}:exists && $!context{$<var-name>}.so) ?? $!context{$<var-name>} ~ $/[0] !! ''}
+
+    method var($/) { make (
+                           if $<var-name>.comb('.') == 1 {
+                               my ($var, $meth) = $<var-name>.split('.');
+                               if $!context{$var}:exists &&  $!context{$var}.^can($meth) {
+                                   $!context{$var}."$meth"() ~ $/[0];
+                               } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.so {
+                                   $!context{$<var-name>} ~ $/[0];
+                               } else {
+                                   ''
+                               }
+                           } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.so {
+                               $!context{$<var-name>} ~ $/[0];
+                           } else {
+                               ''
+                           }
+                       ) }
+
+
     method var_no($/) { make $!context{$<string>}}
 
     method section($/) {
@@ -77,7 +96,7 @@ class RenderActions {
 
 my $default_ext = 'html';
 my $template_dir;
-my %cache;
+my Hash %cache;
 
 our sub default_ext(Str:D $ext?) {
     $default_ext = $ext if $ext;
@@ -100,7 +119,14 @@ sub get(Str:D $name, $dir, $ext) {
     die 'No directory provided!' unless $dir || $template_dir;
     my $path = path($dir || $template_dir, $name, $ext || $default_ext);
     die "No template found at: $path" unless $path.IO.f;
-    %cache{$path} ||= $path.IO.slurp;
+    if %cache{$path}:exists {
+        if $path.IO.modified > %cache{$path}<modified>  {
+             %cache{$path} = { modified => now, content => $path.IO.slurp };
+        }
+    } else {
+        %cache{$path} = { modified => now, content => $path.IO.slurp };
+    }
+    %cache{$path}<content>;
 }
 
 our sub render(Str:D :$template! is copy, :%context, :$dir, :$ext is copy, :$inline) {
