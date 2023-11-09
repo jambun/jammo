@@ -48,7 +48,7 @@ class RenderActions {
                                } else {
                                    ''
                                }
-                           } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.so {
+                           } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.defined && $!context{$<var-name>}.chars.so {
                                $!context{$<var-name>} ~ $/[0];
                            } else {
                                ''
