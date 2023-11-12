@@ -11,7 +11,7 @@ grammar G {
     token close-tag { '}'**2..3 }
     token var  { <open-tag> <.ws> <var-name> <.ws> <close-tag> (<.ws>) }
 
-    token partial    { <open-tag> '>' <.ws> <partial-name> <.ws> <close-tag> }
+    token partial    { <open-tag> '>' <.ws> <partial-name> <.ws> <topic-list> <.ws> <close-tag> }
 
     token section-tag { '{{#' }
     token not-section-tag { '{{^' }
@@ -25,6 +25,16 @@ grammar G {
     token var-name  { <[\w\d_\.]>+ }
     token partial-name  { <[\w\d_.\\]>+ }
     token section-name  { <[\w\d_]>+ }
+
+    token topic-list { <topic-entry> * % <topic-delim> }
+    token topic-delim { ',' \s* }
+    token topic-entry { <topic-name> ':' <.ws> <topic-value> }
+    token topic-name  { <keyword> }
+    token topic-value { [ <ctx-ref> | <quoted-string> ] }
+    token ctx-ref  { <keyword> }
+    token quoted-string { '"' ~ '"' <literal> }
+    token keyword  { <[\w\d_]>+ }
+    token literal { <-["]>* }
 }
 
 class RenderActions {
@@ -62,7 +72,7 @@ class RenderActions {
         my $sname = $/[0].Str;
 
         if ($!context{$sname}:exists && $!context{$sname}.so) {
-            my %context =  $!context;
+            my %context = $!context;
             if ($!context{$sname}.WHAT ~~ List | Seq) {
                 make ($!context{$sname}.map: -> $ctx {
                     %context ,= $ctx.Hash;
@@ -89,7 +99,21 @@ class RenderActions {
         }
     }
 
-    method partial($/) { make JamMo::render(:template($<partial-name>.Str), :context($!context), :dir($!dir), :ext($!ext)) }
+    method topic-list($/) { make $<topic-entry>>>.made.hash; }
+    method topic-entry($/) { make $<topic-name>.made => $<topic-value>.made; }
+    method topic-name($/) { make $<keyword>.made; }
+    method topic-value($/) { make $<ctx-ref>.made || $<quoted-string><literal>.made; }
+    method ctx-ref($/) { make $!context{$/.Str}; }
+    method keyword($/) { make $/.Str; }
+    method literal($/) { make $/.Str; }
+
+    method partial($/) {
+        my %context = $!context;
+        if $<topic-list> {
+            %context ,= $<topic-list>.made;
+        }
+        make JamMo::render(:template($<partial-name>.Str), :context(%context), :dir($!dir), :ext($!ext));
+    }
 
     method text($/) { make $/.Str }
 }
