@@ -51,7 +51,7 @@ class RenderActions {
     method var($/) { make (
                            if $<var-name>.comb('.') == 1 {
                                my ($var, $meth) = $<var-name>.split('.');
-                               if $!context{$var}:exists &&  $!context{$var}.^can($meth) {
+                               if $!context{$var}:exists && $!context{$var}.^can($meth) {
                                    $!context{$var}."$meth"() ~ $/[0];
                                } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.so {
                                    $!context{$<var-name>} ~ $/[0];
@@ -102,7 +102,14 @@ class RenderActions {
     method topic-list($/) { make $<topic-entry>>>.made.hash; }
     method topic-entry($/) { make $<topic-name>.made => $<topic-value>.made; }
     method topic-name($/) { make $<keyword>.made; }
-    method topic-value($/) { make $<ctx-ref>.made || $<quoted-string><literal>.made; }
+    method topic-value($/) {
+        my $ref = $<ctx-ref>.made;
+        if $ref.defined {
+            make $ref;
+        } else {
+            make $<quoted-string><literal>.made;
+        }
+    }
     method ctx-ref($/) { make $!context{$/.Str}; }
     method keyword($/) { make $/.Str; }
     method literal($/) { make $/.Str; }
