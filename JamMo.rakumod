@@ -51,7 +51,7 @@ class RenderActions {
     method var($/) { make (
                            if $<var-name>.comb('.') == 1 {
                                my ($var, $meth) = $<var-name>.split('.');
-                               if $!context{$var}:exists && $!context{$var}.^can($meth) {
+                               if $!context{$var}:exists && $!context{$var}.^can($meth) && $!context{$var}."$meth"() ~~ Cool {
                                    $!context{$var}."$meth"() ~ $/[0];
                                } elsif $!context{$<var-name>}:exists && $!context{$<var-name>}.so {
                                    $!context{$<var-name>} ~ $/[0];
