@@ -1,22 +1,26 @@
+use HTML::Escape;
+
 unit module JamMo;
 
 grammar G {
     token TOP       { <.ws> <nodes> <.ws> }
 
     rule nodes      { <node>* }
-    rule node       { <var> || <partial> || <section> || <not-section> || <text> }
+    rule node       { <var> || <escvar> || <partial> || <section> || <not-section> || <text> }
 
     # treating var and var_no the same for now - do i need escaping?
     token open-tag { '{'**2..3 }
     token close-tag { '}'**2..3 }
-    token var  { <open-tag> <.ws> <var-name> <.ws> <close-tag> (<.ws>) }
+    token var     { <open-tag> <.ws> <var-name> <.ws> <close-tag> (<.ws>) }
 
     token partial    { <open-tag> '>' <.ws> <partial-name> <.ws> <topic-list> <.ws> <close-tag> }
 
+    token escape-tag { '{{!' }
     token section-tag { '{{#' }
     token not-section-tag { '{{^' }
     token end-section-tag { '{{/' }
 
+    rule  escvar  { <escape-tag> <var-name> <close-tag> (<.ws>) }
     regex section     { <section-tag> <.ws> (<section-name>) <.ws> <close-tag> $<content>=(.+?) <end-section-tag> <.ws> $0 <.ws> <close-tag> }
     regex not-section { <not-section-tag> <.ws> (<section-name>) <.ws> <close-tag> $<content>=(.+?) <end-section-tag> <.ws> $0 <.ws> <close-tag> }
 
@@ -44,9 +48,11 @@ class RenderActions {
 
     method TOP($/) { make $<nodes>.made }
     method nodes($/) { make $<node>>>.made.join }
-    method node($/) { make ($<var> || $<text> || $<partial> || $<section> || $<not-section>).made }
+    method node($/) { make ($<var> || $<escvar> || $<text> || $<partial> || $<section> || $<not-section>).made }
 
 #    method var($/) { make ($!context{$<var-name>}:exists && $!context{$<var-name>}.so) ?? $!context{$<var-name>} ~ $/[0] !! ''}
+
+    method escvar($/) { make escape-html(self.var($/)) }
 
     method var($/) { make (
                            if $<var-name>.comb('.') == 1 {
